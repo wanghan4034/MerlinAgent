@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Mercari JP scraping agent.
+"""Mercari JP scraping agent with incremental storage and notifications.
 
 Usage examples:
   python mercari_agent.py --keywords "ポケモンカード" --max-pages 2
-  python mercari_agent.py --keywords "ニンテンドースイッチ" "遊戯王" --headful
+  python mercari_agent.py --keywords "ニンテンドースイッチ" --db-path data/mercari.db
+  python mercari_agent.py --keywords "遊戯王" --telegram-bot-token xxx --telegram-chat-id yyy
 """
 
 from __future__ import annotations
@@ -13,15 +14,14 @@ import json
 import logging
 import random
 import re
+import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List
 from urllib.parse import quote_plus
-
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
+from urllib.request import Request, urlopen
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -42,23 +42,158 @@ class MercariItem:
     scraped_at: str
 
 
+class ItemStore:
+    """SQLite-based incremental and dedup storage."""
+
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self._init_schema()
+
+    def _init_schema(self) -> None:
+        self.conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS items (
+                item_url TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                keyword TEXT NOT NULL,
+                price_jpy INTEGER,
+                image_url TEXT,
+                seller_name TEXT,
+                is_sold INTEGER NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                occurrence_count INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_items_keyword_last_seen
+            ON items(keyword, last_seen_at DESC);
+            """
+        )
+        self.conn.commit()
+
+    def upsert_item(self, item: MercariItem) -> bool:
+        """Return True if this item is new, False if existing record updated."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT item_url FROM items WHERE item_url = ?", (item.item_url,))
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute(
+                """
+                INSERT INTO items (
+                    item_url, title, keyword, price_jpy, image_url, seller_name, is_sold,
+                    first_seen_at, last_seen_at, occurrence_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    item.item_url,
+                    item.title,
+                    item.keyword,
+                    item.price_jpy,
+                    item.image_url,
+                    item.seller_name,
+                    int(item.is_sold),
+                    item.scraped_at,
+                    item.scraped_at,
+                ),
+            )
+            self.conn.commit()
+            return True
+
+        cursor.execute(
+            """
+            UPDATE items
+            SET title = ?, keyword = ?, price_jpy = ?, image_url = ?, seller_name = ?,
+                is_sold = ?, last_seen_at = ?, occurrence_count = occurrence_count + 1
+            WHERE item_url = ?
+            """,
+            (
+                item.title,
+                item.keyword,
+                item.price_jpy,
+                item.image_url,
+                item.seller_name,
+                int(item.is_sold),
+                item.scraped_at,
+                item.item_url,
+            ),
+        )
+        self.conn.commit()
+        return False
+
+    def close(self) -> None:
+        self.conn.close()
+
+
+class Notifier:
+    def __init__(self, telegram_bot_token: str | None, telegram_chat_id: str | None, feishu_webhook: str | None) -> None:
+        self.telegram_bot_token = telegram_bot_token
+        self.telegram_chat_id = telegram_chat_id
+        self.feishu_webhook = feishu_webhook
+
+    def notify_new_items(self, items: List[MercariItem]) -> None:
+        if not items:
+            return
+        message = self._build_message(items)
+        if self.telegram_bot_token and self.telegram_chat_id:
+            self._send_telegram(message)
+        if self.feishu_webhook:
+            self._send_feishu(message)
+
+    @staticmethod
+    def _build_message(items: List[MercariItem]) -> str:
+        lines = [f"🛎️ Mercari 新商品提醒：{len(items)} 件"]
+        for item in items[:5]:
+            price_text = f"¥{item.price_jpy}" if item.price_jpy is not None else "价格未知"
+            sold_text = "[SOLD]" if item.is_sold else ""
+            lines.append(f"- {item.title} {sold_text} | {price_text} | {item.item_url}")
+        if len(items) > 5:
+            lines.append(f"... 其余 {len(items) - 5} 件请查看输出文件或数据库")
+        return "\n".join(lines)
+
+    def _send_telegram(self, text: str) -> None:
+        api_url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
+        payload = json.dumps({"chat_id": self.telegram_chat_id, "text": text}).encode("utf-8")
+        request = Request(api_url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlopen(request, timeout=15) as response:
+                if response.status >= 400:
+                    logging.warning("Telegram notify failed with status=%s", response.status)
+        except Exception as exc:
+            logging.warning("Telegram notify error: %s", exc)
+
+    def _send_feishu(self, text: str) -> None:
+        payload = json.dumps({"msg_type": "text", "content": {"text": text}}).encode("utf-8")
+        request = Request(self.feishu_webhook, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlopen(request, timeout=15) as response:
+                if response.status >= 400:
+                    logging.warning("Feishu notify failed with status=%s", response.status)
+        except Exception as exc:
+            logging.warning("Feishu notify error: %s", exc)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Scrape Mercari Japan search result pages")
     parser.add_argument("--keywords", nargs="+", required=True, help="One or more search keywords")
     parser.add_argument("--max-pages", type=int, default=1, help="Pages per keyword (default: 1)")
     parser.add_argument("--wait-seconds", type=float, default=1.5, help="Wait between pages")
     parser.add_argument("--output", type=Path, default=Path("output/mercari_items.jsonl"))
+    parser.add_argument("--db-path", type=Path, default=Path("data/mercari_items.db"), help="SQLite path for dedup/incremental scraping")
     parser.add_argument("--headful", action="store_true", help="Run browser with UI")
     parser.add_argument("--timeout-ms", type=int, default=30000, help="Page timeout in milliseconds")
+    parser.add_argument("--telegram-bot-token", default=None, help="Telegram bot token for realtime alerts")
+    parser.add_argument("--telegram-chat-id", default=None, help="Telegram chat id for realtime alerts")
+    parser.add_argument("--feishu-webhook", default=None, help="Feishu custom bot webhook URL")
+    parser.add_argument("--notify-all", action="store_true", help="Notify all scraped items. Default is only new items")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
 
 
 def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        level=getattr(logging, level),
-    )
+    logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=getattr(logging, level))
 
 
 def parse_price(price_text: str | None) -> int | None:
@@ -84,19 +219,13 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
 
     for idx in range(count):
         card = cards.nth(idx)
-
         title = card.locator("mer-text[data-testid='thumbnail-item-name']").first.text_content() or ""
         price_text = card.locator("span[data-testid='price']").first.text_content()
-
-        link_el = card.locator("a").first
-        href = link_el.get_attribute("href")
+        href = card.locator("a").first.get_attribute("href")
         item_url = f"https://jp.mercari.com{href}" if href and href.startswith("/") else (href or "")
-
         image_url = card.locator("img").first.get_attribute("src")
         seller_name = card.locator("span[data-testid='thumbnail-item-seller']").first.text_content()
-
         sold_badge = card.locator("span", has_text="SOLD")
-        is_sold = sold_badge.count() > 0
 
         item = MercariItem(
             keyword=keyword,
@@ -105,7 +234,7 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
             item_url=item_url,
             image_url=image_url,
             seller_name=seller_name.strip() if seller_name else None,
-            is_sold=is_sold,
+            is_sold=sold_badge.count() > 0,
             scraped_at=now_iso,
         )
         if item.title and item.item_url:
@@ -115,9 +244,9 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
 
 def write_jsonl(path: Path, items: Iterable[MercariItem]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
+    with path.open("a", encoding="utf-8") as file_obj:
         for item in items:
-            f.write(json.dumps(asdict(item), ensure_ascii=False) + "\n")
+            file_obj.write(json.dumps(asdict(item), ensure_ascii=False) + "\n")
 
 
 def run_agent(
@@ -125,12 +254,21 @@ def run_agent(
     max_pages: int,
     wait_seconds: float,
     output: Path,
+    db_path: Path,
     headful: bool,
     timeout_ms: int,
-) -> int:
-    total = 0
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not headful)
+    notifier: Notifier,
+    notify_all: bool,
+) -> tuple[int, int]:
+    total_scraped = 0
+    total_new = 0
+    store = ItemStore(db_path)
+
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=not headful)
         context = browser.new_context(user_agent=random.choice(USER_AGENTS), locale="ja-JP")
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
@@ -149,8 +287,18 @@ def run_agent(
 
                 items = extract_items_from_page(page, keyword)
                 write_jsonl(output, items)
-                total += len(items)
-                logging.info("Collected %d items from page %d", len(items), page_num)
+
+                new_items: List[MercariItem] = []
+                for item in items:
+                    is_new = store.upsert_item(item)
+                    if is_new:
+                        new_items.append(item)
+
+                total_scraped += len(items)
+                total_new += len(new_items)
+                logging.info("Collected %d items from page %d (%d new)", len(items), page_num, len(new_items))
+
+                notifier.notify_new_items(items if notify_all else new_items)
 
                 sleep_sec = wait_seconds + random.uniform(0.2, 0.9)
                 time.sleep(sleep_sec)
@@ -158,23 +306,33 @@ def run_agent(
         context.close()
         browser.close()
 
-    return total
+    store.close()
+    return total_scraped, total_new
 
 
 def main() -> None:
     args = parse_args()
     setup_logging(args.log_level)
+    notifier = Notifier(
+        telegram_bot_token=args.telegram_bot_token,
+        telegram_chat_id=args.telegram_chat_id,
+        feishu_webhook=args.feishu_webhook,
+    )
     logging.info("Output path: %s", args.output)
+    logging.info("SQLite path: %s", args.db_path)
 
-    collected = run_agent(
+    total_scraped, total_new = run_agent(
         keywords=args.keywords,
         max_pages=args.max_pages,
         wait_seconds=args.wait_seconds,
         output=args.output,
+        db_path=args.db_path,
         headful=args.headful,
         timeout_ms=args.timeout_ms,
+        notifier=notifier,
+        notify_all=args.notify_all,
     )
-    logging.info("Done. Total collected items: %d", collected)
+    logging.info("Done. Total scraped items: %d | new items: %d", total_scraped, total_new)
 
 
 if __name__ == "__main__":

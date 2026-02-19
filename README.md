@@ -1,14 +1,17 @@
-# Mercari JP 自动爬取 Agent
+# Mercari JP 自动爬取 Agent（增强版）
 
-这是一个基于 **Playwright** 的 Mercari（日本煤炉）搜索结果抓取 agent。它会按关键词抓取列表页商品并输出为 JSONL。
+这是一个基于 **Playwright + SQLite** 的 Mercari（日本煤炉）抓取 Agent，支持：
+- 定时任务（cron / systemd timer）
+- 去重与增量抓取（SQLite）
+- Telegram / 飞书实时通知
 
 ## 功能
-- 支持多个关键词轮询抓取。
-- 支持分页（`--max-pages`）。
-- 输出结构化字段（标题、价格、链接、卖家、是否售出、抓取时间）。
-- 自动随机化 User-Agent，降低单一请求特征。
+- 多关键词与分页抓取。
+- 列表页结构化解析（标题、价格、链接、卖家、SOLD 状态）。
+- JSONL 全量落盘（便于追溯）+ SQLite 增量去重（便于业务消费）。
+- 实时通知：默认仅通知“新上架”项目，可切换为通知全部抓取项。
 
-## 快速开始
+## 安装
 
 ```bash
 python -m venv .venv
@@ -17,29 +20,85 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-运行示例：
+## 运行示例
+
+### 1) 基础抓取（增量 + 去重）
 
 ```bash
 python mercari_agent.py \
   --keywords "ポケモンカード" "ニンテンドースイッチ" \
   --max-pages 2 \
-  --output output/mercari_items.jsonl
+  --output output/mercari_items.jsonl \
+  --db-path data/mercari_items.db
 ```
 
-## 输出格式
-每一行是一个 JSON 对象，例如：
+### 2) Telegram 实时通知（默认只通知新商品）
 
-```json
-{"keyword":"ポケモンカード","title":"...","price_jpy":3200,"item_url":"https://jp.mercari.com/item/...","image_url":"...","seller_name":"...","is_sold":false,"scraped_at":"2026-02-19T03:00:00+00:00"}
+```bash
+python mercari_agent.py \
+  --keywords "遊戯王" \
+  --telegram-bot-token "<BOT_TOKEN>" \
+  --telegram-chat-id "<CHAT_ID>"
+```
+
+### 3) 飞书实时通知
+
+```bash
+python mercari_agent.py \
+  --keywords "任天堂" \
+  --feishu-webhook "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+```
+
+### 4) 通知全部抓取项目（不只新项目）
+
+```bash
+python mercari_agent.py --keywords "ポケカ" --notify-all
 ```
 
 ## 参数说明
 - `--keywords`: 必填，至少一个关键词。
-- `--max-pages`: 每个关键词抓取页数，默认 1。
-- `--wait-seconds`: 翻页等待间隔（会附加随机抖动），默认 1.5。
-- `--output`: 输出 JSONL 路径，默认 `output/mercari_items.jsonl`。
-- `--headful`: 显示浏览器界面运行（默认无头模式）。
-- `--timeout-ms`: 页面超时，默认 30000。
+- `--max-pages`: 每关键词抓取页数，默认 `1`。
+- `--wait-seconds`: 翻页等待基础间隔（会附加随机抖动），默认 `1.5`。
+- `--output`: JSONL 输出路径，默认 `output/mercari_items.jsonl`。
+- `--db-path`: SQLite 数据库路径，默认 `data/mercari_items.db`。
+- `--headful`: 有头模式运行浏览器。
+- `--timeout-ms`: 页面等待超时（毫秒），默认 `30000`。
+- `--telegram-bot-token` / `--telegram-chat-id`: Telegram 通知配置。
+- `--feishu-webhook`: 飞书机器人 Webhook。
+- `--notify-all`: 开启后通知所有抓取结果（默认仅通知新增）。
+
+## SQLite 去重逻辑
+- 以 `item_url` 作为唯一键。
+- 首次出现：写入 `first_seen_at`。
+- 后续重复出现：更新 `last_seen_at` 并 `occurrence_count + 1`。
+
+## 定时任务
+
+### Cron
+
+每 15 分钟抓取一次：
+
+```cron
+*/15 * * * * cd /workspace/MerlinAgent && /usr/bin/python3 mercari_agent.py --keywords "ポケモンカード" --max-pages 2 --db-path data/mercari_items.db --output output/mercari_items.jsonl >> logs/cron.log 2>&1
+```
+
+> 建议先 `mkdir -p logs output data`。
+
+### systemd timer
+
+仓库提供了示例：
+- `deploy/systemd/mercari-agent.service`
+- `deploy/systemd/mercari-agent.timer`
+
+安装（Linux）：
+
+```bash
+sudo cp deploy/systemd/mercari-agent.service /etc/systemd/system/
+sudo cp deploy/systemd/mercari-agent.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mercari-agent.timer
+sudo systemctl status mercari-agent.timer
+```
 
 ## 合规提醒
-请在使用前确认目标网站服务条款、robots 政策以及当地法律法规，合理控制请求频率，仅用于合法合规的数据采集场景。
+请在使用前确认目标网站服务条款、robots 政策以及当地法律法规，合理控制请求频率，仅用于合法合规的数据采集。
