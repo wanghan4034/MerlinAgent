@@ -72,6 +72,15 @@ python mercari_agent.py --keywords "ポケカ" --notify-all
 - 首次出现：写入 `first_seen_at`。
 - 后续重复出现：更新 `last_seen_at` 并 `occurrence_count + 1`。
 
+
+## 测试
+
+运行单元测试：
+
+```bash
+python3 -m unittest discover -s tests -p "test_*.py" -v
+```
+
 ## 定时任务
 
 ### Cron
