@@ -73,6 +73,24 @@ python mercari_agent.py --keywords "ポケカ" --notify-all
 - 后续重复出现：更新 `last_seen_at` 并 `occurrence_count + 1`。
 
 
+
+## 网页版可视化控制台（给非技术用户）
+
+启动 Web 页面：
+
+```bash
+python3 web_app.py
+```
+
+然后在浏览器打开：`http://127.0.0.1:8000`
+
+页面能力：
+- 图形化配置抓取参数（关键词、页数、间隔、超时、输出路径、数据库路径）。
+- 一键启动抓取任务，并实时查看任务状态（queued/running/completed/failed）。
+- 数据面板展示总商品数、关键词数、已售数量、最近更新时间。
+- 商品列表表格展示近期抓取结果，可点击跳转商品链接。
+- 支持 Telegram / 飞书通知参数直接在页面填写。
+
 ## 测试
 
 运行单元测试：
