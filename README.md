@@ -33,6 +33,9 @@ docker compose up -d --build
 
 启动后访问：`http://127.0.0.1:8000`
 
+> 若你希望使用 `.env` 文件管理代理/通知变量，请先执行：`cp .env.example .env`。
+> 不创建 `.env` 也可以启动容器（仅不会自动注入这些变量）。
+
 ### 2) 数据持久化
 
 `docker-compose.yml` 已默认挂载：

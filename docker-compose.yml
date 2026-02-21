@@ -9,11 +9,15 @@ services:
       - ./output:/app/output
       - ./logs:/app/logs
       - ./config:/app/config
-    env_file:
-      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - SCHEDULER_CONFIG=/app/config/scheduler.json
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - FEISHU_WEBHOOK=${FEISHU_WEBHOOK:-}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
