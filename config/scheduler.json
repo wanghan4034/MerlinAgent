@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "interval_minutes": 15,
+  "keywords": ["ポケモンカード", "ニンテンドースイッチ"],
+  "max_pages": 1,
+  "wait_seconds": 1.5,
+  "timeout_ms": 30000,
+  "output_path": "output/mercari_items.jsonl",
+  "db_path": "data/mercari_items.db",
+  "notify_all": false
+}
