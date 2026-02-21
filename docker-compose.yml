@@ -8,6 +8,10 @@ services:
       - ./data:/app/data
       - ./output:/app/output
       - ./logs:/app/logs
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

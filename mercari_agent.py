@@ -188,6 +188,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--telegram-chat-id", default=None, help="Telegram chat id for realtime alerts")
     parser.add_argument("--feishu-webhook", default=None, help="Feishu custom bot webhook URL")
     parser.add_argument("--notify-all", action="store_true", help="Notify all scraped items. Default is only new items")
+    parser.add_argument("--proxy-server", default=None, help="Proxy server for browser, e.g. socks5://host:port")
+    parser.add_argument("--proxy-username", default=None, help="Proxy username if needed")
+    parser.add_argument("--proxy-password", default=None, help="Proxy password if needed")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
 
@@ -259,6 +262,9 @@ def run_agent(
     timeout_ms: int,
     notifier: Notifier,
     notify_all: bool,
+    proxy_server: str | None,
+    proxy_username: str | None,
+    proxy_password: str | None,
 ) -> tuple[int, int]:
     total_scraped = 0
     total_new = 0
@@ -267,8 +273,17 @@ def run_agent(
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     from playwright.sync_api import sync_playwright
 
+    launch_kwargs = {"headless": not headful}
+    if proxy_server:
+        proxy_conf: dict[str, str] = {"server": proxy_server}
+        if proxy_username:
+            proxy_conf["username"] = proxy_username
+        if proxy_password:
+            proxy_conf["password"] = proxy_password
+        launch_kwargs["proxy"] = proxy_conf
+
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=not headful)
+        browser = playwright.chromium.launch(**launch_kwargs)
         context = browser.new_context(user_agent=random.choice(USER_AGENTS), locale="ja-JP")
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
@@ -331,6 +346,9 @@ def main() -> None:
         timeout_ms=args.timeout_ms,
         notifier=notifier,
         notify_all=args.notify_all,
+        proxy_server=args.proxy_server,
+        proxy_username=args.proxy_username,
+        proxy_password=args.proxy_password,
     )
     logging.info("Done. Total scraped items: %d | new items: %d", total_scraped, total_new)
 

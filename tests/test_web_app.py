@@ -1,4 +1,5 @@
 import importlib
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -108,6 +109,41 @@ class WebAppTest(unittest.TestCase):
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Mercari 爬虫可视化控制台 Pro", resp.get_data(as_text=True))
+
+
+    def test_run_uses_env_proxy_defaults(self):
+        old = {
+            "PROXY_SERVER": os.environ.get("PROXY_SERVER"),
+            "PROXY_USERNAME": os.environ.get("PROXY_USERNAME"),
+            "PROXY_PASSWORD": os.environ.get("PROXY_PASSWORD"),
+        }
+        os.environ["PROXY_SERVER"] = "socks5://127.0.0.1:1080"
+        os.environ["PROXY_USERNAME"] = "u"
+        os.environ["PROXY_PASSWORD"] = "p"
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                db_path = str(Path(tmpdir) / "items.db")
+                out = str(Path(tmpdir) / "items.jsonl")
+                with patch.object(self.module, "run_agent", return_value=(0, 0)):
+                    resp = self.client.post(
+                        "/api/run",
+                        json={
+                            "keywords": "测试",
+                            "db_path": db_path,
+                            "output_path": out,
+                        },
+                    )
+                self.assertEqual(resp.status_code, 202)
+                payload = resp.get_json()["payload"]
+                self.assertEqual(payload["proxy_server"], "socks5://127.0.0.1:1080")
+                self.assertEqual(payload["proxy_username"], "u")
+                self.assertEqual(payload["proxy_password"], "p")
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
     def test_run_job_success_and_jobs_list(self):
         with tempfile.TemporaryDirectory() as tmpdir:

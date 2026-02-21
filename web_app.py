@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -175,6 +176,9 @@ def _run_job(job_id: str, payload: dict[str, Any]) -> None:
             timeout_ms=payload["timeout_ms"],
             notifier=notifier,
             notify_all=payload["notify_all"],
+            proxy_server=payload.get("proxy_server") or None,
+            proxy_username=payload.get("proxy_username") or None,
+            proxy_password=payload.get("proxy_password") or None,
         )
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "completed"
@@ -246,9 +250,12 @@ def api_run():
         "output_path": data.get("output_path", "output/mercari_items.jsonl"),
         "db_path": data.get("db_path", "data/mercari_items.db"),
         "notify_all": bool(data.get("notify_all", False)),
-        "telegram_bot_token": data.get("telegram_bot_token", ""),
-        "telegram_chat_id": data.get("telegram_chat_id", ""),
-        "feishu_webhook": data.get("feishu_webhook", ""),
+        "telegram_bot_token": data.get("telegram_bot_token", "") or os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        "telegram_chat_id": data.get("telegram_chat_id", "") or os.getenv("TELEGRAM_CHAT_ID", ""),
+        "feishu_webhook": data.get("feishu_webhook", "") or os.getenv("FEISHU_WEBHOOK", ""),
+        "proxy_server": data.get("proxy_server", "") or os.getenv("PROXY_SERVER", ""),
+        "proxy_username": data.get("proxy_username", "") or os.getenv("PROXY_USERNAME", ""),
+        "proxy_password": data.get("proxy_password", "") or os.getenv("PROXY_PASSWORD", ""),
     }
 
     job_meta = {

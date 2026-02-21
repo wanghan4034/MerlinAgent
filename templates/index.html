@@ -70,6 +70,19 @@
             <label class="form-label">飞书 Webhook（可选）</label>
             <input id="feishu" class="form-control" />
           </div>
+
+          <div class="col-md-4">
+            <label class="form-label">代理地址（可选）</label>
+            <input id="proxy-server" class="form-control" placeholder="socks5://host:port" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">代理用户名（可选）</label>
+            <input id="proxy-username" class="form-control" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">代理密码（可选）</label>
+            <input id="proxy-password" class="form-control" type="password" />
+          </div>
         </div>
         <div class="d-flex gap-3 mt-3 align-items-center">
           <div class="form-check">
@@ -155,6 +168,9 @@ function getPayload() {
     telegram_bot_token: document.getElementById('tg-token').value,
     telegram_chat_id: document.getElementById('tg-chat').value,
     feishu_webhook: document.getElementById('feishu').value,
+    proxy_server: document.getElementById('proxy-server').value,
+    proxy_username: document.getElementById('proxy-username').value,
+    proxy_password: document.getElementById('proxy-password').value,
     notify_all: document.getElementById('notify-all').checked,
   };
 }
@@ -169,6 +185,9 @@ function applyPayload(data) {
   document.getElementById('tg-token').value = data.telegram_bot_token || '';
   document.getElementById('tg-chat').value = data.telegram_chat_id || '';
   document.getElementById('feishu').value = data.feishu_webhook || '';
+  document.getElementById('proxy-server').value = data.proxy_server || '';
+  document.getElementById('proxy-username').value = data.proxy_username || '';
+  document.getElementById('proxy-password').value = data.proxy_password || '';
   document.getElementById('notify-all').checked = !!data.notify_all;
 }
 
