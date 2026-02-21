@@ -66,17 +66,22 @@ docker compose down
 - `PROXY_USERNAME`
 - `PROXY_PASSWORD`
 
-### ShadowsocksX 常见值
-- 本机 SOCKS5 端口通常是 `1080`。
-- Docker 容器访问宿主机代理时建议使用 `host.docker.internal`。
+### 结合你当前 ShadowsocksX 配置（截图）
+你当前本地 SOCKS5 监听为：`127.0.0.1:10808`。
+
+- **CLI 直接在 macOS 上运行时**：
+  - `PROXY_SERVER=socks5://127.0.0.1:10808`
+- **Docker 容器内运行时**（推荐）：
+  - `PROXY_SERVER=socks5://host.docker.internal:10808`
 
 ```env
-PROXY_SERVER=socks5://host.docker.internal:1080
+# Docker 推荐
+PROXY_SERVER=socks5://host.docker.internal:10808
 PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
-> 若连接失败，请检查 ShadowsocksX 是否已启动、端口是否正确，以及是否允许本机应用通过该 SOCKS5 端口访问。
+> 若连接失败，请检查 ShadowsocksX 是否已启动、端口是否为 `10808`，以及代理模式是否允许本机应用通过该 SOCKS5 端口访问。
 
 在 Web 页面中也可直接填写“代理地址/用户名/密码”；为空时后端会自动读取 `.env` 中的 `PROXY_*` 变量。
 
