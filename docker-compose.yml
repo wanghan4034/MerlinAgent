@@ -1,0 +1,13 @@
+services:
+  mercari-agent-web:
+    build: .
+    container_name: mercari-agent-web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

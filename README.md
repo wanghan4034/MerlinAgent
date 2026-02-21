@@ -20,6 +20,38 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+
+## Docker 部署（推荐）
+
+已封装为 Docker 应用，包含运行所需环境（Python + Playwright + 浏览器依赖）。
+
+### 1) 构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+启动后访问：`http://127.0.0.1:8000`
+
+### 2) 数据持久化
+
+`docker-compose.yml` 已默认挂载：
+- `./data -> /app/data`（SQLite 数据库、模板配置）
+- `./output -> /app/output`（JSONL 导出）
+- `./logs -> /app/logs`（运行日志）
+
+### 3) 查看日志
+
+```bash
+docker compose logs -f mercari-agent-web
+```
+
+### 4) 停止应用
+
+```bash
+docker compose down
+```
+
 ## 运行示例
 
 ### 1) 基础抓取（增量 + 去重）
