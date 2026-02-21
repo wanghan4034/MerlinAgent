@@ -53,27 +53,32 @@ docker compose down
 ```
 
 
-## 中国网络下访问 Mercari（Shadowsocks 配置）
+## 中国网络下访问 Mercari（ShadowsocksX 配置）
 
-如果你在中国大陆，需要通过 Shadowsocks/代理访问日本煤炉，请在仓库根目录创建 `.env`（可由 `.env.example` 复制）并至少提供以下配置：
+你提到使用 **ShadowsocksX**（macOS）。该场景下通常只需配置 SOCKS5 出口即可。
+
+请在仓库根目录创建 `.env`（可由 `.env.example` 复制）并提供：
 
 ### 必填
-- `PROXY_SERVER`: 代理地址，推荐 `socks5://<host>:<port>`。
+- `PROXY_SERVER`：代理地址，格式 `socks5://<host>:<port>`。
 
-### 选填（当代理需要认证时）
+### 选填（一般本地 ShadowsocksX 不需要）
 - `PROXY_USERNAME`
 - `PROXY_PASSWORD`
 
-### 示例
+### ShadowsocksX 常见值
+- 本机 SOCKS5 端口通常是 `1080`。
+- Docker 容器访问宿主机代理时建议使用 `host.docker.internal`。
+
 ```env
 PROXY_SERVER=socks5://host.docker.internal:1080
 PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
-> 如果你的 Shadowsocks 客户端只提供本地 SOCKS 端口（如 1080），Docker 中建议使用 `host.docker.internal` 访问宿主机代理端口。
+> 若连接失败，请检查 ShadowsocksX 是否已启动、端口是否正确，以及是否允许本机应用通过该 SOCKS5 端口访问。
 
-在 Web 页面中也可直接填写“代理地址/用户名/密码”；为空时后端会自动读取 `.env` 的上述变量。
+在 Web 页面中也可直接填写“代理地址/用户名/密码”；为空时后端会自动读取 `.env` 中的 `PROXY_*` 变量。
 
 ## 运行示例
 
