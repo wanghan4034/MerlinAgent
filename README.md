@@ -53,6 +53,29 @@ docker compose down
 ```
 
 
+
+### 5) 容器内自动定时抓取（默认每 15 分钟）
+
+现在容器启动后会自动执行“定时新增抓取”（无需你再手动配置宿主机 cron/systemd）。
+
+定时配置文件：`config/scheduler.json`
+
+```json
+{
+  "enabled": true,
+  "interval_minutes": 15,
+  "keywords": ["ポケモンカード", "ニンテンドースイッチ"],
+  "max_pages": 1,
+  "wait_seconds": 1.5,
+  "timeout_ms": 30000,
+  "output_path": "output/mercari_items.jsonl",
+  "db_path": "data/mercari_items.db",
+  "notify_all": false
+}
+```
+
+你只需修改 `interval_minutes` 即可调整抓取频率（例如改成 `5` 表示每 5 分钟）。
+
 ## 中国网络下访问 Mercari（ShadowsocksX 配置）
 
 你提到使用 **ShadowsocksX**（macOS）。该场景下通常只需配置 SOCKS5 出口即可。

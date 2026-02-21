@@ -8,10 +8,12 @@ services:
       - ./data:/app/data
       - ./output:/app/output
       - ./logs:/app/logs
+      - ./config:/app/config
     env_file:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - SCHEDULER_CONFIG=/app/config/scheduler.json
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

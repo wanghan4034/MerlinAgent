@@ -14,4 +14,4 @@ RUN mkdir -p /app/data /app/output /app/logs
 
 EXPOSE 8000
 
-CMD ["python3", "web_app.py"]
+CMD ["python3", "container_main.py"]
