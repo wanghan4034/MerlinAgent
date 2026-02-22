@@ -37,14 +37,15 @@
         <h5>快速抓取（业务模式）</h5>
         <div class="row g-2">
           <div class="col-md-8">
-            <label class="form-label">商品关键词（推荐单个词；多关键词请用分号或换行）</label>
-            <input id="keywords" class="form-control" value="chanel" placeholder="例如：chanel, clothes（单词） 或 chanel; clothes（多个词）" />
+            <label class="form-label">商品关键词（支持中文一句话自动提取关键词）</label>
+            <input id="keywords" class="form-control" value="chanel" placeholder="例如：想找香奈儿香水和口红（会自动提取关键词）" />
           </div>
           <div class="col-md-4">
             <label class="form-label">抓取页数</label>
             <input id="max-pages" class="form-control" type="number" value="2" min="1" max="20" />
           </div>
         </div>
+        <div id="keyword-hint" class="small text-muted mt-2">支持输入中文描述（如：想找香奈儿包包），系统会自动提取并搜索关键词。</div>
 
         <div class="d-flex gap-2 mt-3">
           <button class="btn btn-primary" onclick="startJob()">开始抓取</button>
@@ -158,7 +159,8 @@ async function startJob() {
     return;
   }
   currentJobId = data.job_id;
-  msg.textContent = '任务已提交: ' + currentJobId;
+  const parsed = (data.payload && Array.isArray(data.payload.keywords)) ? data.payload.keywords.join(' / ') : '';
+  msg.textContent = '任务已提交: ' + currentJobId + (parsed ? (' | 关键词: ' + parsed) : '');
   pollJob();
   loadJobs();
 }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -23,6 +24,64 @@ JOBS_LOCK = threading.Lock()
 PROFILES_PATH = Path("data/ui_profiles.json")
 
 
+
+_CN_TOKEN_ALIASES: dict[str, str] = {
+    "香奈儿": "chanel",
+    "香奈爾": "chanel",
+    "路易威登": "louis vuitton",
+    "lv": "louis vuitton",
+    "古驰": "gucci",
+    "迪奥": "dior",
+    "爱马仕": "hermes",
+    "包": "bag",
+    "手袋": "bag",
+    "衣服": "clothes",
+    "外套": "jacket",
+    "鞋": "shoes",
+    "口红": "lipstick",
+    "香水": "perfume",
+}
+
+_CN_STOPWORDS = {
+    "我", "想", "要", "找", "看看", "一下", "的", "和", "或者", "还有", "请", "帮", "帮我", "一个", "一些", "那种", "有没有", "推荐",
+}
+
+
+def _contains_cjk(text: str) -> bool:
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
+def _extract_cn_keywords(text: str) -> list[str]:
+    compact = re.sub(r"[，。！？、：；,.!?/]+", " ", text)
+    pieces = [p.strip() for p in compact.split() if p.strip()]
+    out: list[str] = []
+
+    for piece in pieces:
+        if piece in _CN_STOPWORDS:
+            continue
+        mapped = _CN_TOKEN_ALIASES.get(piece)
+        if mapped:
+            out.append(mapped)
+            continue
+        if _contains_cjk(piece):
+            # Keep short Chinese product/brand hints, avoid very long sentence fragments.
+            if 1 < len(piece) <= 8:
+                out.append(piece)
+            continue
+        out.append(piece)
+
+    # Add alias hits for terms embedded in full sentence.
+    for cn, en in _CN_TOKEN_ALIASES.items():
+        if cn in text:
+            out.append(en)
+
+    dedup: list[str] = []
+    for token in out:
+        t = token.strip()
+        if t and t not in dedup:
+            dedup.append(t)
+    return dedup[:6]
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -35,8 +94,13 @@ def _parse_keywords(value: str | list[str]) -> list[str]:
     if not text:
         return []
 
+    # Chinese natural language sentence mode: auto-extract key terms.
+    if _contains_cjk(text) and all(sep not in text for sep in ["\n", ";", "；"]):
+        guessed = _extract_cn_keywords(text)
+        if guessed:
+            return guessed
+
     # Prefer semicolon/newline as multi-keyword separators.
-    # This keeps single Mercari phrase keywords like `chanel, clothes` intact.
     if "\n" in text or ";" in text or "；" in text:
         parts: list[str] = []
         for line in text.splitlines():
@@ -44,8 +108,6 @@ def _parse_keywords(value: str | list[str]) -> list[str]:
         return [word for word in parts if word]
 
     # CSV-style parsing supports quoted/escaped commas when user intentionally provides a list.
-    #   "chanel, clothes", lv  -> ["chanel, clothes", "lv"]
-    #   chanel\, clothes, lv   -> ["chanel, clothes", "lv"]
     if ('"' in text) or ("\\," in text):
         try:
             row = next(csv.reader([text], skipinitialspace=True, escapechar="\\"), [])
@@ -55,7 +117,6 @@ def _parse_keywords(value: str | list[str]) -> list[str]:
         if keywords:
             return keywords
 
-    # Heuristic: keep single `word, phrase` input as one keyword to match URL behavior.
     if text.count(",") == 1 and ", " in text:
         return [text]
 
