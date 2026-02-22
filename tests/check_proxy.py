@@ -10,11 +10,19 @@ import os
 import sys
 
 
+def _get_env_or_default(name: str, default: str) -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    value = value.strip()
+    return value if value else default
+
+
 def main() -> int:
-    proxy_server = os.getenv("PROXY_SERVER", "socks5://127.0.0.1:10808")
-    target_url = os.getenv("PROXY_CHECK_URL", "https://ipinfo.io/json")
-    timeout = float(os.getenv("PROXY_CHECK_TIMEOUT", "10"))
-    expected_city = os.getenv("PROXY_EXPECTED_CITY", "Tokyo")
+    proxy_server = _get_env_or_default("PROXY_SERVER", "socks5://host.docker.internal:10808")
+    target_url = _get_env_or_default("PROXY_CHECK_URL", "https://ipinfo.io/json")
+    timeout = float(_get_env_or_default("PROXY_CHECK_TIMEOUT", "10"))
+    expected_city = _get_env_or_default("PROXY_EXPECTED_CITY", "Tokyo")
 
     try:
         import requests
@@ -25,6 +33,7 @@ def main() -> int:
         return 1
 
     proxies = {"http": proxy_server, "https": proxy_server}
+    print(f"当前 proxy_server={proxy_server}")
     try:
         response = requests.get(target_url, proxies=proxies, timeout=timeout)
         response.raise_for_status()

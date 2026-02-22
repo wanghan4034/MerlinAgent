@@ -12,7 +12,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - SCHEDULER_CONFIG=/app/config/scheduler.json
-      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_SERVER=${PROXY_SERVER:-socks5://host.docker.internal:10808}
       - PROXY_USERNAME=${PROXY_USERNAME:-}
       - PROXY_PASSWORD=${PROXY_PASSWORD:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}

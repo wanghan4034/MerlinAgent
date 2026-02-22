@@ -91,6 +91,7 @@ python3 tests/check_proxy.py
 默认会请求 `https://ipinfo.io/json`，并检查 `city` 是否为 `Tokyo`。
 
 可选环境变量：
+- 容器内默认会使用 `socks5://host.docker.internal:10808`（若 `PROXY_SERVER` 为空会自动回退到该值）。
 - `PROXY_SERVER`（默认 `socks5://host.docker.internal:10808`）
 - `PROXY_CHECK_URL`（默认 `https://ipinfo.io/json`）
 - `PROXY_CHECK_TIMEOUT`（默认 `10` 秒）
