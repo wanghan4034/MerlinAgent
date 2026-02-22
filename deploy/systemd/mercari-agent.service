@@ -1,0 +1,12 @@
+[Unit]
+Description=Mercari JP Scraping Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/workspace/MerlinAgent
+ExecStart=/usr/bin/python3 /workspace/MerlinAgent/mercari_agent.py --keywords "ポケモンカード" "ニンテンドースイッチ" --max-pages 2 --db-path /workspace/MerlinAgent/data/mercari_items.db --output /workspace/MerlinAgent/output/mercari_items.jsonl
+
+[Install]
+WantedBy=multi-user.target
