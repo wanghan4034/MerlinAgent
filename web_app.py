@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import threading
@@ -26,8 +27,27 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _parse_keywords(value: str) -> list[str]:
-    return [word.strip() for word in value.split(",") if word.strip()]
+def _parse_keywords(value: str | list[str]) -> list[str]:
+    if isinstance(value, list):
+        return [word.strip() for word in value if isinstance(word, str) and word.strip()]
+
+    text = (value or "").strip()
+    if not text:
+        return []
+
+    # CSV-style parsing supports quoted/escaped commas, e.g.:
+    #   "chanel, clothes", lv  -> ["chanel, clothes", "lv"]
+    #   chanel\, clothes, lv     -> ["chanel, clothes", "lv"]
+    try:
+        row = next(csv.reader([text], skipinitialspace=True, escapechar="\\"), [])
+    except Exception:
+        row = []
+
+    keywords = [word.strip() for word in row if isinstance(word, str) and word.strip()]
+    if keywords:
+        return keywords
+
+    return [line.strip() for line in text.splitlines() if line.strip()]
 
 
 def _safe_int(raw: str | None, default: int, lower: int | None = None, upper: int | None = None) -> int:
