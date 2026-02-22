@@ -92,9 +92,10 @@ python3 tests/check_proxy.py
 - `PROXY_SERVER`（默认 `socks5://host.docker.internal:10808`）
 - `PROXY_CHECK_URL`（默认 `https://jp.mercari.com`）
 
-若看到 `Missing dependencies for SOCKS support`，说明镜像内缺少 SOCKS 依赖。当前仓库已补充 `PySocks`，重新构建镜像即可：
+若看到 `Missing dependencies for SOCKS support`，说明镜像内缺少 SOCKS 依赖。当前仓库已补充 `requests[socks]` + `PySocks`，重新构建镜像即可：
 
 ```bash
+docker compose down --remove-orphans
 docker compose build --no-cache
 docker compose up -d
 ```
