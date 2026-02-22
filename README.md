@@ -105,6 +105,25 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
+
+### 常见 failed 原因：Playwright 浏览器可执行文件不存在
+
+如果任务状态里出现：
+`Executable doesn't exist at /ms-playwright/...`
+
+通常是 **Playwright Python 包版本与镜像内浏览器二进制不匹配** 或镜像未正确安装浏览器。
+本仓库已做两点修复：
+1) 固定 `playwright==1.50.0`（与基础镜像对齐）
+2) 构建时显式执行 `playwright install chromium`
+
+请务必重新构建并重启容器：
+
+```bash
+docker compose down --remove-orphans
+docker compose build --no-cache
+docker compose up -d
+```
+
 ## 中国网络下访问 Mercari（ShadowsocksX 配置）
 
 你提到使用 **ShadowsocksX**（macOS）。该场景下通常只需配置 SOCKS5 出口即可。
