@@ -193,6 +193,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--proxy-password", default=None, help="Proxy password if needed")
     parser.add_argument("--goto-retries", type=int, default=2, help="Retry count for page navigation errors")
     parser.add_argument("--retry-backoff-seconds", type=float, default=2.0, help="Backoff seconds between retries")
+    parser.add_argument("--field-timeout-ms", type=int, default=1500, help="Timeout per field extraction on item cards")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
 
@@ -216,6 +217,22 @@ def build_search_url(keyword: str, page: int) -> str:
     return f"https://jp.mercari.com/search?keyword={encoded}&page={page}"
 
 
+def _safe_text(locator, timeout_ms: int = 1500) -> str | None:
+    try:
+        text = locator.text_content(timeout=timeout_ms)
+        return text.strip() if text else None
+    except Exception:
+        return None
+
+
+def _safe_attr(locator, attr: str, timeout_ms: int = 1500) -> str | None:
+    try:
+        value = locator.get_attribute(attr, timeout=timeout_ms)
+        return value.strip() if value else None
+    except Exception:
+        return None
+
+
 def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
     cards = page.locator("li[data-testid='item-cell']")
     count = cards.count()
@@ -224,13 +241,19 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
 
     for idx in range(count):
         card = cards.nth(idx)
-        title = card.locator("mer-text[data-testid='thumbnail-item-name']").first.text_content() or ""
-        price_text = card.locator("span[data-testid='price']").first.text_content()
-        href = card.locator("a").first.get_attribute("href")
+
+        title = _safe_text(card.locator("mer-text[data-testid='thumbnail-item-name']").first) or ""
+        price_text = _safe_text(card.locator("span[data-testid='price']").first)
+        href = _safe_attr(card.locator("a").first, "href")
         item_url = f"https://jp.mercari.com{href}" if href and href.startswith("/") else (href or "")
-        image_url = card.locator("img").first.get_attribute("src")
-        seller_name = card.locator("span[data-testid='thumbnail-item-seller']").first.text_content()
-        sold_badge = card.locator("span", has_text="SOLD")
+        image_url = _safe_attr(card.locator("img").first, "src")
+        seller_name = _safe_text(card.locator("span[data-testid='thumbnail-item-seller']").first)
+
+        try:
+            sold_badge = card.locator("span", has_text="SOLD")
+            is_sold = sold_badge.count() > 0
+        except Exception:
+            is_sold = False
 
         item = MercariItem(
             keyword=keyword,
@@ -239,7 +262,7 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
             item_url=item_url,
             image_url=image_url,
             seller_name=seller_name.strip() if seller_name else None,
-            is_sold=sold_badge.count() > 0,
+            is_sold=is_sold,
             scraped_at=now_iso,
         )
         if item.title and item.item_url:
@@ -269,6 +292,7 @@ def run_agent(
     proxy_password: str | None,
     goto_retries: int,
     retry_backoff_seconds: float,
+    field_timeout_ms: int,
 ) -> tuple[int, int]:
     total_scraped = 0
     total_new = 0
@@ -329,6 +353,7 @@ def run_agent(
                     logging.error("Skip page after retries exhausted: keyword=%s page=%s", keyword, page_num)
                     continue
 
+                _ = field_timeout_ms  # kept for future tuning hooks
                 items = extract_items_from_page(page, keyword)
                 write_jsonl(output, items)
 
@@ -380,6 +405,7 @@ def main() -> None:
         proxy_password=args.proxy_password,
         goto_retries=args.goto_retries,
         retry_backoff_seconds=args.retry_backoff_seconds,
+        field_timeout_ms=args.field_timeout_ms,
     )
     logging.info("Done. Total scraped items: %d | new items: %d", total_scraped, total_new)
 

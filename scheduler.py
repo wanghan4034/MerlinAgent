@@ -34,6 +34,7 @@ def load_scheduler_config(path: Path) -> dict[str, Any]:
     data.setdefault("notify_all", False)
     data.setdefault("goto_retries", 2)
     data.setdefault("retry_backoff_seconds", 2.0)
+    data.setdefault("field_timeout_ms", 1500)
     data.setdefault("enabled", True)
     return data
 
@@ -59,6 +60,7 @@ def run_once(config: dict[str, Any]) -> tuple[int, int]:
         proxy_password=os.getenv("PROXY_PASSWORD") or config.get("proxy_password"),
         goto_retries=int(config.get("goto_retries", 2)),
         retry_backoff_seconds=float(config.get("retry_backoff_seconds", 2.0)),
+        field_timeout_ms=int(config.get("field_timeout_ms", 1500)),
     )
 
 

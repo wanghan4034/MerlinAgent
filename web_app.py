@@ -181,6 +181,7 @@ def _run_job(job_id: str, payload: dict[str, Any]) -> None:
             proxy_password=payload.get("proxy_password") or None,
             goto_retries=int(payload.get("goto_retries", 2)),
             retry_backoff_seconds=float(payload.get("retry_backoff_seconds", 2.0)),
+            field_timeout_ms=int(payload.get("field_timeout_ms", 1500)),
         )
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "completed"
@@ -260,6 +261,7 @@ def api_run():
         "proxy_password": data.get("proxy_password", "") or os.getenv("PROXY_PASSWORD", ""),
         "goto_retries": max(0, int(data.get("goto_retries", 2))),
         "retry_backoff_seconds": max(0.2, float(data.get("retry_backoff_seconds", 2.0))),
+        "field_timeout_ms": max(300, int(data.get("field_timeout_ms", 1500))),
     }
 
     job_meta = {

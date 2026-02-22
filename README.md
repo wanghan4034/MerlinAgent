@@ -204,6 +204,7 @@ python mercari_agent.py --keywords "ポケカ" --notify-all
 - `--notify-all`: 开启后通知所有抓取结果（默认仅通知新增）。
 - `--goto-retries`: 页面导航失败重试次数，默认 `2`。
 - `--retry-backoff-seconds`: 重试间隔秒数，默认 `2.0`。
+- `--field-timeout-ms`: 单字段提取超时（毫秒），默认 `1500`，用于避免页面局部元素缺失导致卡死。
 
 ## SQLite 去重逻辑
 - 以 `item_url` 作为唯一键。

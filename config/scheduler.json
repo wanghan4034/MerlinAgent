@@ -12,5 +12,6 @@
   "db_path": "data/mercari_items.db",
   "notify_all": false,
   "goto_retries": 2,
-  "retry_backoff_seconds": 2.0
+  "retry_backoff_seconds": 2.0,
+  "field_timeout_ms": 1500
 }
