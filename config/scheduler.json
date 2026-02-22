@@ -13,5 +13,6 @@
   "notify_all": false,
   "goto_retries": 2,
   "retry_backoff_seconds": 2.0,
-  "field_timeout_ms": 1500
+  "field_timeout_ms": 1500,
+  "page_ready_wait_ms": 1200
 }

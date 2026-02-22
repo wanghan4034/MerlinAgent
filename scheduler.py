@@ -35,6 +35,7 @@ def load_scheduler_config(path: Path) -> dict[str, Any]:
     data.setdefault("goto_retries", 2)
     data.setdefault("retry_backoff_seconds", 2.0)
     data.setdefault("field_timeout_ms", 1500)
+    data.setdefault("page_ready_wait_ms", 1200)
     data.setdefault("enabled", True)
     return data
 
@@ -61,6 +62,7 @@ def run_once(config: dict[str, Any]) -> tuple[int, int]:
         goto_retries=int(config.get("goto_retries", 2)),
         retry_backoff_seconds=float(config.get("retry_backoff_seconds", 2.0)),
         field_timeout_ms=int(config.get("field_timeout_ms", 1500)),
+        page_ready_wait_ms=int(config.get("page_ready_wait_ms", 1200)),
     )
 
 

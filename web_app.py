@@ -182,6 +182,7 @@ def _run_job(job_id: str, payload: dict[str, Any]) -> None:
             goto_retries=int(payload.get("goto_retries", 2)),
             retry_backoff_seconds=float(payload.get("retry_backoff_seconds", 2.0)),
             field_timeout_ms=int(payload.get("field_timeout_ms", 1500)),
+            page_ready_wait_ms=int(payload.get("page_ready_wait_ms", 1200)),
         )
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "completed"
@@ -262,6 +263,7 @@ def api_run():
         "goto_retries": max(0, int(data.get("goto_retries", 2))),
         "retry_backoff_seconds": max(0.2, float(data.get("retry_backoff_seconds", 2.0))),
         "field_timeout_ms": max(300, int(data.get("field_timeout_ms", 1500))),
+        "page_ready_wait_ms": max(200, int(data.get("page_ready_wait_ms", 1200))),
     }
 
     job_meta = {

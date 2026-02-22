@@ -19,6 +19,7 @@ class SchedulerTest(unittest.TestCase):
             self.assertEqual(cfg["goto_retries"], 2)
             self.assertEqual(cfg["retry_backoff_seconds"], 2.0)
             self.assertEqual(cfg["field_timeout_ms"], 1500)
+            self.assertEqual(cfg["page_ready_wait_ms"], 1200)
 
     def test_load_scheduler_config_requires_keywords(self):
         with tempfile.TemporaryDirectory() as tmpdir:

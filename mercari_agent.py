@@ -194,6 +194,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goto-retries", type=int, default=2, help="Retry count for page navigation errors")
     parser.add_argument("--retry-backoff-seconds", type=float, default=2.0, help="Backoff seconds between retries")
     parser.add_argument("--field-timeout-ms", type=int, default=1500, help="Timeout per field extraction on item cards")
+    parser.add_argument("--page-ready-wait-ms", type=int, default=1200, help="Extra wait after navigation before extraction")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
 
@@ -234,35 +235,82 @@ def _safe_attr(locator, attr: str, timeout_ms: int = 1500) -> str | None:
 
 
 def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
-    cards = page.locator("li[data-testid='item-cell']")
-    count = cards.count()
-    items: List[MercariItem] = []
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    for idx in range(count):
-        card = cards.nth(idx)
+    try:
+        rows = page.evaluate(
+            """
+            () => {
+              const toAbs = (href) => href && href.startsWith('/') ? `https://jp.mercari.com${href}` : href;
+              const uniq = new Map();
 
-        title = _safe_text(card.locator("mer-text[data-testid='thumbnail-item-name']").first) or ""
-        price_text = _safe_text(card.locator("span[data-testid='price']").first)
-        href = _safe_attr(card.locator("a").first, "href")
-        item_url = f"https://jp.mercari.com{href}" if href and href.startswith("/") else (href or "")
-        image_url = _safe_attr(card.locator("img").first, "src")
-        seller_name = _safe_text(card.locator("span[data-testid='thumbnail-item-seller']").first)
+              const candidates = Array.from(document.querySelectorAll("li[data-testid='item-cell'], [data-testid='item-cell'], article, div"));
+              for (const el of candidates) {
+                const a = el.querySelector("a[href*='/item/']");
+                if (!a) continue;
+                const href = toAbs(a.getAttribute('href') || '');
+                if (!href) continue;
 
-        try:
-            sold_badge = card.locator("span", has_text="SOLD")
-            is_sold = sold_badge.count() > 0
-        except Exception:
-            is_sold = False
+                const titleEl = el.querySelector("[data-testid='thumbnail-item-name'], mer-text[data-testid='thumbnail-item-name']");
+                const priceEl = el.querySelector("[data-testid='price']");
+                const sellerEl = el.querySelector("[data-testid='thumbnail-item-seller']");
+                const img = el.querySelector("img");
 
+                const title = (titleEl?.textContent || img?.getAttribute('alt') || a.textContent || '').trim();
+                const priceText = (priceEl?.textContent || '').trim();
+                const sellerName = (sellerEl?.textContent || '').trim();
+                const imageUrl = img?.getAttribute('src') || null;
+                const text = (el.textContent || '').toUpperCase();
+                const isSold = text.includes('SOLD') || text.includes('売り切れ');
+
+                if (!uniq.has(href)) {
+                  uniq.set(href, {
+                    title,
+                    price_text: priceText,
+                    item_url: href,
+                    image_url: imageUrl,
+                    seller_name: sellerName || null,
+                    is_sold: isSold,
+                  });
+                }
+              }
+
+              // fallback: global anchors if card selectors changed
+              if (uniq.size === 0) {
+                const anchors = Array.from(document.querySelectorAll("a[href*='/item/']"));
+                for (const a of anchors) {
+                  const href = toAbs(a.getAttribute('href') || '');
+                  if (!href || uniq.has(href)) continue;
+                  const img = a.querySelector('img');
+                  const title = (img?.getAttribute('alt') || a.textContent || '').trim();
+                  uniq.set(href, {
+                    title,
+                    price_text: '',
+                    item_url: href,
+                    image_url: img?.getAttribute('src') || null,
+                    seller_name: null,
+                    is_sold: false,
+                  });
+                }
+              }
+
+              return Array.from(uniq.values());
+            }
+            """
+        )
+    except Exception:
+        rows = []
+
+    items: List[MercariItem] = []
+    for row in rows:
         item = MercariItem(
             keyword=keyword,
-            title=title.strip(),
-            price_jpy=parse_price(price_text),
-            item_url=item_url,
-            image_url=image_url,
-            seller_name=seller_name.strip() if seller_name else None,
-            is_sold=is_sold,
+            title=(row.get("title") or "").strip(),
+            price_jpy=parse_price(row.get("price_text")),
+            item_url=(row.get("item_url") or "").strip(),
+            image_url=row.get("image_url"),
+            seller_name=(row.get("seller_name") or None),
+            is_sold=bool(row.get("is_sold", False)),
             scraped_at=now_iso,
         )
         if item.title and item.item_url:
@@ -293,6 +341,7 @@ def run_agent(
     goto_retries: int,
     retry_backoff_seconds: float,
     field_timeout_ms: int,
+    page_ready_wait_ms: int,
 ) -> tuple[int, int]:
     total_scraped = 0
     total_new = 0
@@ -326,7 +375,7 @@ def run_agent(
                 for attempt in range(goto_retries + 1):
                     try:
                         page.goto(url, wait_until="domcontentloaded")
-                        page.wait_for_selector("li[data-testid='item-cell']", timeout=timeout_ms)
+                        page.wait_for_timeout(max(200, page_ready_wait_ms))
                         success = True
                         break
                     except PlaywrightTimeoutError:
@@ -406,6 +455,7 @@ def main() -> None:
         goto_retries=args.goto_retries,
         retry_backoff_seconds=args.retry_backoff_seconds,
         field_timeout_ms=args.field_timeout_ms,
+        page_ready_wait_ms=args.page_ready_wait_ms,
     )
     logging.info("Done. Total scraped items: %d | new items: %d", total_scraped, total_new)
 
