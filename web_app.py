@@ -99,6 +99,10 @@ def _parse_keywords(value: str | list[str]) -> list[str]:
     if _contains_cjk(text) and all(sep not in text for sep in ["\n", ";", "；"]):
         guessed = _extract_cn_keywords(text)
         if guessed:
+            # Keep Chinese NL extraction as an AND-style single query on Mercari.
+            # Example: 想找香奈儿包包 -> "chanel, bag" (later normalized to "chanel bag" in URL builder).
+            if len(guessed) > 1:
+                return [", ".join(guessed)]
             return guessed
 
     # Prefer semicolon/newline as multi-keyword separators.

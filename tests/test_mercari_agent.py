@@ -19,6 +19,11 @@ class ParseHelpersTest(unittest.TestCase):
         self.assertIn("keyword=%E3%83%9D%E3%82%B1%E3%83%A2%E3%83%B3+%E3%82%AB%E3%83%BC%E3%83%89", url)
         self.assertTrue(url.endswith("&page=2"))
 
+    def test_build_search_url_comma_means_and(self):
+        url = build_search_url("chanel, bag", 1)
+        self.assertIn("keyword=chanel+bag", url)
+        self.assertNotIn("%2C", url)
+
 
 class ItemStoreTest(unittest.TestCase):
     def test_upsert_insert_then_update(self):

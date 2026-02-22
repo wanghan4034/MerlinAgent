@@ -216,7 +216,12 @@ def parse_price(price_text: str | None) -> int | None:
 
 
 def build_search_url(keyword: str, page: int) -> str:
-    encoded = quote_plus(keyword)
+    normalized = keyword.replace("，", ",")
+    # Treat comma-separated keyword input as AND-style query terms.
+    # e.g. "chanel, bag" -> "chanel bag"
+    normalized = re.sub(r"\s*,\s*", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    encoded = quote_plus(normalized)
     return f"https://jp.mercari.com/search?keyword={encoded}&page={page}"
 
 
