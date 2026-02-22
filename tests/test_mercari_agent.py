@@ -9,6 +9,7 @@ class ParseHelpersTest(unittest.TestCase):
     def test_parse_price_valid(self):
         self.assertEqual(parse_price("¥12,345"), 12345)
         self.assertEqual(parse_price("1234円"), 1234)
+        self.assertEqual(parse_price("￥12，345"), 12345)
 
     def test_parse_price_invalid(self):
         self.assertIsNone(parse_price(None))

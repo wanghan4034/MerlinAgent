@@ -208,7 +208,7 @@ def setup_logging(level: str) -> None:
 def parse_price(price_text: str | None) -> int | None:
     if not price_text:
         return None
-    normalized = price_text.replace(",", "")
+    normalized = price_text.replace(",", "").replace("，", "")
     m = re.search(r"(\d+)", normalized)
     if not m:
         return None
@@ -259,12 +259,14 @@ def extract_items_from_page(page, keyword: str) -> List[MercariItem]:
                 if (!href) continue;
 
                 const titleEl = el.querySelector("[data-testid='thumbnail-item-name'], mer-text[data-testid='thumbnail-item-name']");
-                const priceEl = el.querySelector("[data-testid='price']");
+                const priceEl = el.querySelector("[data-testid='price'], [data-testid='thumbnail-item-price'], [data-testid*='price'], mer-text[data-testid*='price']");
                 const sellerEl = el.querySelector("[data-testid='thumbnail-item-seller']");
                 const img = el.querySelector("img");
 
                 const title = (titleEl?.textContent || img?.getAttribute('alt') || a.textContent || '').trim();
-                const priceText = (priceEl?.textContent || '').trim();
+                const rawText = (el.textContent || '').trim();
+                const matchedPrice = rawText.match(/[¥￥]\s*[\d,，]+|[\d,，]+\s*円/);
+                const priceText = (priceEl?.textContent || matchedPrice?.[0] || '').trim();
                 const sellerName = (sellerEl?.textContent || '').trim();
                 const imageUrl = img?.getAttribute('src') || null;
                 const text = (el.textContent || '').toUpperCase();
