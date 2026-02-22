@@ -1,0 +1,23 @@
+services:
+  mercari-agent-web:
+    build: .
+    container_name: mercari-agent-web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SCHEDULER_CONFIG=/app/config/scheduler.json
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - FEISHU_WEBHOOK=${FEISHU_WEBHOOK:-}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
