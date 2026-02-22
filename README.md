@@ -126,6 +126,8 @@ docker compose up -d
 
 ## 中国网络下访问 Mercari（ShadowsocksX 配置）
 
+若未传 `--proxy-server`，CLI 会自动读取环境变量 `PROXY_SERVER`。
+
 你提到使用 **ShadowsocksX**（macOS）。该场景下通常只需配置 SOCKS5 出口即可。
 
 请在仓库根目录创建 `.env`（可由 `.env.example` 复制）并提供：
@@ -206,6 +208,7 @@ python mercari_agent.py --keywords "ポケカ" --notify-all
 - `--retry-backoff-seconds`: 重试间隔秒数，默认 `2.0`。
 - `--field-timeout-ms`: 单字段提取超时（毫秒），默认 `1500`，用于避免页面局部元素缺失导致卡死。
 - `--page-ready-wait-ms`: 页面打开后额外等待（毫秒），默认 `1200`，用于提升动态页面抓取稳定性。
+- `--proxy-preflight`: 开启后在抓取前先做一次代理连通性检查（建议在容器内开启）。
 
 ## SQLite 去重逻辑
 - 以 `item_url` 作为唯一键。

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import random
 import re
 import sqlite3
@@ -194,6 +195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goto-retries", type=int, default=2, help="Retry count for page navigation errors")
     parser.add_argument("--retry-backoff-seconds", type=float, default=2.0, help="Backoff seconds between retries")
     parser.add_argument("--field-timeout-ms", type=int, default=1500, help="Timeout per field extraction on item cards")
+    parser.add_argument("--proxy-preflight", action="store_true", help="Check proxy connectivity before scraping")
     parser.add_argument("--page-ready-wait-ms", type=int, default=1200, help="Extra wait after navigation before extraction")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
@@ -428,6 +430,28 @@ def run_agent(
     return total_scraped, total_new
 
 
+def resolve_proxy_settings(args: argparse.Namespace) -> tuple[str | None, str | None, str | None]:
+    proxy_server = args.proxy_server or os.getenv("PROXY_SERVER")
+    proxy_username = args.proxy_username or os.getenv("PROXY_USERNAME")
+    proxy_password = args.proxy_password or os.getenv("PROXY_PASSWORD")
+    return proxy_server, proxy_username, proxy_password
+
+
+def proxy_preflight_check(proxy_server: str, timeout_seconds: float = 8.0) -> bool:
+    try:
+        import requests
+
+        proxies = {"http": proxy_server, "https": proxy_server}
+        response = requests.get("https://ipinfo.io/json", proxies=proxies, timeout=timeout_seconds)
+        response.raise_for_status()
+        city = response.json().get("city")
+        logging.info("Proxy preflight passed. city=%s proxy=%s", city, proxy_server)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("Proxy preflight failed: proxy=%s error=%s", proxy_server, exc)
+        return False
+
+
 def main() -> None:
     args = parse_args()
     setup_logging(args.log_level)
@@ -436,8 +460,13 @@ def main() -> None:
         telegram_chat_id=args.telegram_chat_id,
         feishu_webhook=args.feishu_webhook,
     )
+    proxy_server, proxy_username, proxy_password = resolve_proxy_settings(args)
     logging.info("Output path: %s", args.output)
     logging.info("SQLite path: %s", args.db_path)
+    logging.info("Effective proxy server: %s", proxy_server or "(none)")
+
+    if args.proxy_preflight and proxy_server:
+        proxy_preflight_check(proxy_server)
 
     total_scraped, total_new = run_agent(
         keywords=args.keywords,
@@ -449,9 +478,9 @@ def main() -> None:
         timeout_ms=args.timeout_ms,
         notifier=notifier,
         notify_all=args.notify_all,
-        proxy_server=args.proxy_server,
-        proxy_username=args.proxy_username,
-        proxy_password=args.proxy_password,
+        proxy_server=proxy_server,
+        proxy_username=proxy_username,
+        proxy_password=proxy_password,
         goto_retries=args.goto_retries,
         retry_backoff_seconds=args.retry_backoff_seconds,
         field_timeout_ms=args.field_timeout_ms,

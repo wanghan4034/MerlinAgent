@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from mercari_agent import ItemStore, MercariItem, Notifier, build_search_url, parse_price
+from mercari_agent import ItemStore, MercariItem, Notifier, build_search_url, parse_price, resolve_proxy_settings
 
 
 class ParseHelpersTest(unittest.TestCase):
@@ -95,6 +95,28 @@ class NotifierMessageTest(unittest.TestCase):
         self.assertIn("商品B", msg)
         self.assertIn("价格未知", msg)
         self.assertIn("[SOLD]", msg)
+
+class ProxyResolveTest(unittest.TestCase):
+    def test_resolve_proxy_settings_env_fallback(self):
+        import os
+        from argparse import Namespace
+
+        old = {k: os.environ.get(k) for k in ["PROXY_SERVER", "PROXY_USERNAME", "PROXY_PASSWORD"]}
+        os.environ["PROXY_SERVER"] = "socks5://host.docker.internal:10808"
+        os.environ["PROXY_USERNAME"] = "u"
+        os.environ["PROXY_PASSWORD"] = "p"
+        try:
+            args = Namespace(proxy_server=None, proxy_username=None, proxy_password=None)
+            ps, pu, pp = resolve_proxy_settings(args)
+            self.assertEqual(ps, "socks5://host.docker.internal:10808")
+            self.assertEqual(pu, "u")
+            self.assertEqual(pp, "p")
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
 
 if __name__ == "__main__":
