@@ -5,8 +5,8 @@ export interface TaskConfig {
   minPrice?: number;
   maxPrice?: number;
   includeSold: boolean;
-  matchMode: "any" | "all";
-  sortBy: "latest" | "priceAsc" | "priceDesc";
+  matchMode: "prefix" | "contains";
+  sortBy: "newest" | "priceAsc" | "valueScore";
 }
 
 export interface TaskStats {
@@ -21,6 +21,7 @@ export interface TaskStats {
 export interface Task {
   id: string;
   keyword: string;
+  extractedKeywords: string[];
   pageCount: number;
   status: TaskStatus;
   progress: number;
@@ -31,6 +32,7 @@ export interface Task {
   config: TaskConfig;
   rawParams: Record<string, unknown>;
   logs: string[];
+  errorMessage?: string;
 }
 
 export interface Item {
@@ -50,10 +52,11 @@ export interface Item {
 
 export interface ItemFilters {
   title?: string;
-  keyword?: string;
+  containsKeyword?: string;
   minPrice?: number;
   maxPrice?: number;
   status?: "all" | ItemStatus;
   recommendedOnly?: boolean;
   tab?: "latest" | "recommended" | "all" | "sold";
+  sortBy?: "newest" | "priceAsc" | "priceDesc" | "valueScore";
 }
