@@ -94,7 +94,7 @@
 
   <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="mb-0">商品看板（更友好）</h5>
+      <h5 class="mb-0">商品看板（最新物品 + 图片）</h5>
       <button class="btn btn-sm btn-outline-secondary" onclick="loadItems()">刷新</button>
     </div>
     <div class="row g-2 mb-2">
@@ -110,6 +110,7 @@
       </div>
       <div class="col-md-1"><button class="btn btn-sm btn-dark w-100" onclick="loadItems()">筛选</button></div>
     </div>
+    <div class="small text-muted mb-2">默认按最近抓取时间倒序展示最新商品，并展示商品图片。</div>
     <div id="item-grid" class="row g-3"></div>
   </div>
 </div>
@@ -225,13 +226,14 @@ async function loadItems() {
     return `
       <div class="col-md-3 col-sm-6">
         <div class="card p-2 item-card h-100">
-          <img src="${esc(row.image_url || '')}" onerror="this.style.display='none'" />
+          <img src="${esc(row.image_url || '')}" alt="商品图片" onerror="this.onerror=null;this.src='https://via.placeholder.com/300x200?text=No+Image';" />
           <div class="mt-2 title">${esc(row.title)}</div>
           <div class="d-flex justify-content-between align-items-center mt-1">
             <strong>¥${esc(row.price_jpy ?? '-')}</strong>${sold}
           </div>
           <div class="small text-muted">关键词: ${esc(row.keyword)}</div>
           <div class="small text-muted">卖家: ${esc(row.seller_name || '-')}</div>
+          <div class="small text-muted">最近出现: ${esc(row.last_seen_at || row.first_seen_at || '-')}</div>
           <a class="btn btn-sm btn-outline-primary mt-2" target="_blank" href="${esc(row.item_url)}">打开商品</a>
         </div>
       </div>

@@ -142,10 +142,10 @@ def _fetch_recent_items(
         rows = conn.execute(
             f"""
             SELECT item_url, title, keyword, price_jpy, seller_name, is_sold,
-                   first_seen_at, last_seen_at, occurrence_count
+                   image_url, first_seen_at, last_seen_at, occurrence_count
             FROM items
             {where_sql}
-            ORDER BY last_seen_at DESC
+            ORDER BY COALESCE(last_seen_at, first_seen_at) DESC, first_seen_at DESC
             LIMIT ?
             """,
             (*args, limit),
