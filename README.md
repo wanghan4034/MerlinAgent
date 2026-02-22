@@ -88,10 +88,13 @@ docker compose down
 python3 tests/check_proxy.py
 ```
 
+默认会请求 `https://ipinfo.io/json`，并检查 `city` 是否为 `Tokyo`。
+
 可选环境变量：
 - `PROXY_SERVER`（默认 `socks5://host.docker.internal:10808`）
-- `PROXY_CHECK_URL`（默认 `https://jp.mercari.com`）
-- `PROXY_CHECK_TIMEOUT`（默认 `20` 秒）
+- `PROXY_CHECK_URL`（默认 `https://ipinfo.io/json`）
+- `PROXY_CHECK_TIMEOUT`（默认 `10` 秒）
+- `PROXY_EXPECTED_CITY`（默认 `Tokyo`）
 
 若看到 `Missing dependencies for SOCKS support`，说明镜像内缺少 SOCKS 依赖。当前仓库已补充 `requests[socks]` + `PySocks`，重新构建镜像即可：
 
