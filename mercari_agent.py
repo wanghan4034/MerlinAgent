@@ -377,6 +377,18 @@ def run_agent(
                 for attempt in range(goto_retries + 1):
                     try:
                         page.goto(url, wait_until="domcontentloaded")
+                        # Mercari is SPA-like and card data may appear later than DOMContentLoaded.
+                        # Wait briefly for item links so keywords like `chanel` do not return false empty pages.
+                        try:
+                            page.wait_for_selector("a[href*='/item/']", timeout=min(timeout_ms, 12000))
+                        except PlaywrightTimeoutError:
+                            logging.warning(
+                                "No item card appeared within wait window: keyword=%s page=%s attempt=%s/%s",
+                                keyword,
+                                page_num,
+                                attempt + 1,
+                                goto_retries + 1,
+                            )
                         page.wait_for_timeout(max(200, page_ready_wait_ms))
                         success = True
                         break
@@ -406,6 +418,19 @@ def run_agent(
 
                 _ = field_timeout_ms  # kept for future tuning hooks
                 items = extract_items_from_page(page, keyword)
+                if not items:
+                    page_title = ""
+                    try:
+                        page_title = page.title()
+                    except Exception:  # noqa: BLE001
+                        page_title = "(unavailable)"
+                    logging.warning(
+                        "No items extracted: keyword=%s page=%s final_url=%s title=%s",
+                        keyword,
+                        page_num,
+                        page.url,
+                        page_title,
+                    )
                 write_jsonl(output, items)
 
                 new_items: List[MercariItem] = []
