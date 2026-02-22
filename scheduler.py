@@ -32,6 +32,8 @@ def load_scheduler_config(path: Path) -> dict[str, Any]:
     data.setdefault("output_path", "output/mercari_items.jsonl")
     data.setdefault("db_path", "data/mercari_items.db")
     data.setdefault("notify_all", False)
+    data.setdefault("goto_retries", 2)
+    data.setdefault("retry_backoff_seconds", 2.0)
     data.setdefault("enabled", True)
     return data
 
@@ -55,6 +57,8 @@ def run_once(config: dict[str, Any]) -> tuple[int, int]:
         proxy_server=os.getenv("PROXY_SERVER") or config.get("proxy_server"),
         proxy_username=os.getenv("PROXY_USERNAME") or config.get("proxy_username"),
         proxy_password=os.getenv("PROXY_PASSWORD") or config.get("proxy_password"),
+        goto_retries=int(config.get("goto_retries", 2)),
+        retry_backoff_seconds=float(config.get("retry_backoff_seconds", 2.0)),
     )
 
 

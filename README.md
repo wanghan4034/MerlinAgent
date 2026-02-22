@@ -202,6 +202,8 @@ python mercari_agent.py --keywords "ポケカ" --notify-all
 - `--telegram-bot-token` / `--telegram-chat-id`: Telegram 通知配置。
 - `--feishu-webhook`: 飞书机器人 Webhook。
 - `--notify-all`: 开启后通知所有抓取结果（默认仅通知新增）。
+- `--goto-retries`: 页面导航失败重试次数，默认 `2`。
+- `--retry-backoff-seconds`: 重试间隔秒数，默认 `2.0`。
 
 ## SQLite 去重逻辑
 - 以 `item_url` 作为唯一键。
@@ -229,6 +231,15 @@ python3 web_app.py
 - 支持 Telegram / 飞书通知参数直接在页面填写。
 - 支持“配置模板”保存/加载/删除，方便不会写代码的用户重复执行相同策略。
 
+
+
+### 运行时报 `ERR_CONNECTION_REFUSED` 的原因
+
+你贴出的报错属于网络链路/代理链路瞬时失败（并非代码语法错误）。常见原因：
+- 代理服务瞬断或端口不可达
+- 容器到宿主机代理转发偶发失败
+
+当前版本已增加页面访问重试机制（默认最多 3 次尝试），遇到单页失败会跳过该页继续跑，不会整任务直接崩溃。
 
 ## Web API（可二次开发）
 - `GET /api/health`: 服务健康检查。

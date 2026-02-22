@@ -191,6 +191,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--proxy-server", default=None, help="Proxy server for browser, e.g. socks5://host:port")
     parser.add_argument("--proxy-username", default=None, help="Proxy username if needed")
     parser.add_argument("--proxy-password", default=None, help="Proxy password if needed")
+    parser.add_argument("--goto-retries", type=int, default=2, help="Retry count for page navigation errors")
+    parser.add_argument("--retry-backoff-seconds", type=float, default=2.0, help="Backoff seconds between retries")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser.parse_args()
 
@@ -265,11 +267,14 @@ def run_agent(
     proxy_server: str | None,
     proxy_username: str | None,
     proxy_password: str | None,
+    goto_retries: int,
+    retry_backoff_seconds: float,
 ) -> tuple[int, int]:
     total_scraped = 0
     total_new = 0
     store = ItemStore(db_path)
 
+    from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     from playwright.sync_api import sync_playwright
 
@@ -293,11 +298,35 @@ def run_agent(
             for page_num in range(1, max_pages + 1):
                 url = build_search_url(keyword, page_num)
                 logging.info("Visit %s", url)
-                try:
-                    page.goto(url, wait_until="domcontentloaded")
-                    page.wait_for_selector("li[data-testid='item-cell']", timeout=timeout_ms)
-                except PlaywrightTimeoutError:
-                    logging.warning("Page timeout: keyword=%s page=%s", keyword, page_num)
+                success = False
+                for attempt in range(goto_retries + 1):
+                    try:
+                        page.goto(url, wait_until="domcontentloaded")
+                        page.wait_for_selector("li[data-testid='item-cell']", timeout=timeout_ms)
+                        success = True
+                        break
+                    except PlaywrightTimeoutError:
+                        logging.warning(
+                            "Page timeout: keyword=%s page=%s attempt=%s/%s",
+                            keyword,
+                            page_num,
+                            attempt + 1,
+                            goto_retries + 1,
+                        )
+                    except PlaywrightError as exc:
+                        logging.warning(
+                            "Navigation error: keyword=%s page=%s attempt=%s/%s error=%s",
+                            keyword,
+                            page_num,
+                            attempt + 1,
+                            goto_retries + 1,
+                            exc,
+                        )
+                    if attempt < goto_retries:
+                        time.sleep(max(0.2, retry_backoff_seconds))
+
+                if not success:
+                    logging.error("Skip page after retries exhausted: keyword=%s page=%s", keyword, page_num)
                     continue
 
                 items = extract_items_from_page(page, keyword)
@@ -349,6 +378,8 @@ def main() -> None:
         proxy_server=args.proxy_server,
         proxy_username=args.proxy_username,
         proxy_password=args.proxy_password,
+        goto_retries=args.goto_retries,
+        retry_backoff_seconds=args.retry_backoff_seconds,
     )
     logging.info("Done. Total scraped items: %d | new items: %d", total_scraped, total_new)
 

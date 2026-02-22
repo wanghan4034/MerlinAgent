@@ -16,6 +16,8 @@ class SchedulerTest(unittest.TestCase):
             self.assertEqual(cfg["keywords"], ["a"])
             self.assertEqual(cfg["max_pages"], 1)
             self.assertEqual(cfg["output_path"], "output/mercari_items.jsonl")
+            self.assertEqual(cfg["goto_retries"], 2)
+            self.assertEqual(cfg["retry_backoff_seconds"], 2.0)
 
     def test_load_scheduler_config_requires_keywords(self):
         with tempfile.TemporaryDirectory() as tmpdir:
