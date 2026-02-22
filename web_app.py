@@ -52,28 +52,29 @@ def _contains_cjk(text: str) -> bool:
 
 
 def _extract_cn_keywords(text: str) -> list[str]:
-    compact = re.sub(r"[，。！？、：；,.!?/]+", " ", text)
-    pieces = [p.strip() for p in compact.split() if p.strip()]
     out: list[str] = []
 
+    # Add alias hits for terms embedded in full sentence first.
+    for cn, en in _CN_TOKEN_ALIASES.items():
+        if cn in text:
+            out.append(en)
+
+    compact = re.sub(r"[，。！？、：；,.!?/]+", " ", text)
+    for stop in _CN_STOPWORDS:
+        compact = compact.replace(stop, " ")
+    pieces = [p.strip() for p in compact.split() if p.strip()]
+
     for piece in pieces:
-        if piece in _CN_STOPWORDS:
-            continue
         mapped = _CN_TOKEN_ALIASES.get(piece)
         if mapped:
             out.append(mapped)
             continue
         if _contains_cjk(piece):
-            # Keep short Chinese product/brand hints, avoid very long sentence fragments.
-            if 1 < len(piece) <= 8:
+            # Keep only short Chinese hints to avoid passing full sentence fragments as keywords.
+            if 1 < len(piece) <= 4:
                 out.append(piece)
             continue
         out.append(piece)
-
-    # Add alias hits for terms embedded in full sentence.
-    for cn, en in _CN_TOKEN_ALIASES.items():
-        if cn in text:
-            out.append(en)
 
     dedup: list[str] = []
     for token in out:
@@ -212,8 +213,8 @@ def _fetch_recent_items(
     clauses = []
     args: list[Any] = []
     if keyword:
-        clauses.append("keyword = ?")
-        args.append(keyword)
+        clauses.append("LOWER(keyword) LIKE ?")
+        args.append(f"%{keyword.lower()}%")
     if sold_only:
         clauses.append("is_sold = 1")
     if min_price is not None:
